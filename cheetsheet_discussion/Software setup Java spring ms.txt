@@ -12,3 +12,6 @@ https://cdn.spring.io/spring-tools/release/STS4/4.29.0.RELEASE/dist/e4.35/spring
 Postman 
 https://www.postman.com/downloads/
 
+In case you want to downloads from google drive in one go:
+https://drive.google.com/file/d/1sev_EA0HUlRufRc9ziY0Hvzh5TIolwhQ/view?usp=sharing
+

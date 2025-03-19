@@ -27,9 +27,15 @@ Key topics:
 => REST basics
 => Spring boot REST application
 => Spring data
+=> ResponseEnitity
+=> Exception handling
+=> validation
+=> Spring boot profile
+=> best practices HATEOAS
 =>Spring boot Monotring and Logging
 => spring boot profile
 => spring boot actuator
+=> Spring boot Full stack application idea
 => Spring Boot microservice architecture
 => spring boot openfeign
 => Spring boot security
@@ -898,53 +904,217 @@ https://www.baeldung.com/spring-rest-openapi-documentation
 
 https://editor.swagger.io/
 
+
 => Documenting a Spring REST API Using OpenAPI 3.0
 =>Swagger is almost equivalent to SOAP formate, used for documentation of REST api
 
-		Step 1:
 
-	<dependency>
-		<groupId>org.springdoc</groupId>
-		<artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
-		<version>2.2.0</version>
-	</dependency>
 
-	Step 2:
+Swagger (OpenAPI documentation of Project)
+--------------------------------------
 
-	http://localhost:8090/bookapp/v3/api-docs
+Step 1: add dep in all projects
+----------------------------------
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+            <version>2.5.0</version>
+        </dependency>
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webmvc-api</artifactId>
+            <version>2.5.0</version>
+        </dependency>
+
+
+Step 2: Configuration openapi customization
+------------------------------------------
+@Configuration
+public class OpenAPIConfig {
+
+    @Bean
+    public OpenAPI productServiceAPI() {
+        return new OpenAPI()
+                .info(new Info().title("Product Service API Busycoder")
+                        .description("This is the REST API for Product Service")
+                        .version("v0.0.1")
+                        .license(new License().name("Apache 2.0")))
+                .externalDocs(new ExternalDocumentation()
+                        .description("You can refer to the Product Service Wiki Documentation")
+                        .url("https://product-service-dummy-url.com/docs"));
+    }
+}
+
+Step 3: customization of path
+--------------------------------
+springdoc.swagger-ui.path=/swagger-ui.html
+springdoc.api-docs.path=/api-docs
+
+
+Step 4: explore swagger endpoint
+http://localhost:8080/swagger-ui/index.html
+http://localhost:8080/api-docs
+
+
+
+
+Step 12: web application with boot
+____________________________
+
+1. We need to put dependency:
+
+		<dependency>
+			<groupId>org.apache.tomcat.embed</groupId>
+			<artifactId>tomcat-embed-jasper</artifactId>
+		</dependency>
+
+		<dependency>
+			<groupId>javax.servlet</groupId>
+			<artifactId>jstl</artifactId>
+		</dependency>
+
+
+2. We need to configure view resolver
+
+spring.mvc.view.prefix:/WEB-INF/views/
+spring.mvc.view.suffix:.jsp
+
+
+3. define controller 
+
+@Controller
+public class ProductController {
 	
-	http://localhost:8090/bookapp/swagger-ui/index.html
+	private ProductService productService;
 
-	http://localhost:8090/bookapp/v3/api-docs.yaml
-
-	Step 3:
-	Customization location
-	springdoc.swagger-ui.path=/swagger-ui-bookapp.html
-
-	@OpenAPIDefinition(info = @Info(title = "bookapp API", version = "2.0" , description = "YMSLI bookapp API"))
-	public class BookappApplication implements CommandLineRunner {
+	@Autowired
+	public ProductController(ProductService productService) {
+		this.productService = productService;
 	}
-
-
 	
-	@OpenAPIDefinition(
-			info = @Info(
-					title = "",
-					description = "",
-					version = "v1",
-					contact = @Contact(
-							name = "",
-							email = "",
-							url = ""
-					),
-					license = @License(
-							name = "Apache 2.0",
-							url = "https://www.cbre.com"
-					)
-			),
-			externalDocs = @ExternalDocumentation(
-					description =  "",
-					url = "https://www.cbre.com/swagger-ui.html"
-			)
-	)
+	@GetMapping("products")
+	public ModelAndView allProducts(ModelAndView mv) {
+		mv.setViewName("products");
+		mv.addObject("products", productService.findAll());
+		
+		return mv;
+	}
+}
 
+put jsp in /bootapp/src/main/webapp/WEB-INF/views
+
+
+4. define jsp view 
+
+<%@ page language="java" contentType="text/html; charset=ISO-8859-1"
+    pageEncoding="ISO-8859-1"%>
+ <%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core" %>
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
+<title>Insert title here</title>
+</head>
+<body>
+	 <table>
+	<thead>
+		<tr>
+			<th>product id</th>
+			<th>product name</th>
+			<th>product price</th>
+		</tr>
+	</thead>
+	<tbody>
+		<c:forEach items="${products}" var="product">
+			<tr>
+				<td>${product.id }</td>
+				<td>${product.name }</td>
+				<td>${product.price }</td>
+			</tr>
+		</c:forEach>
+	</tbody>
+</table>
+
+</body>
+</html>
+
+
+
+
+
+Step 11: deployment spring boot as war file to tomcat
+___________________________________________________
+
+
+
+Step 12: Spring boot mongodb integration:
+______________________________________________
+https://roytuts.com/installing-zip-version-of-mongodb-in-windows/
+
+RDBMS 	MongoDB
+______________
+
+Table 	<--->	Collection
+Column 	<--->	Key
+Value 	<--->	Value
+Records/Rows<--->Document/Object
+
+
+Creating collections, document, storing data etc:
+__________________________________________
+
+show dbs 		// List all databases
+use rajdb 		//Switches to inventory
+show collections  	//List all tables in the current selected database
+
+Creating collections, document, storing data etc
+__________________________________________
+
+	use rajdb;	// create as well switch to rajdb
+
+
+
+choose dependencies: web, devtools, mongo
+step 1: Dao layer
+____________________
+
+@Document(collection = "products")
+public class Product {
+    @Id
+    private String id;
+    private String name;
+    private BigDecimal price;
+    private String category;
+    
+}
+
+
+@Repository
+public interface ProductRepo extends MongoRepository<Product, Integer> {
+    public List<Product> findByName(String name);
+}
+
+
+step 5: application.properties
+___________________
+server.servlet.context-path=/empapp
+server.port=8080
+spring.data.mongodb.host=localhost
+spring.data.mongodb.port=27017
+spring.data.mongodb.database=mongodb
+spring.data.mongodb.repositories.enabled=true
+
+
+
+
+Spring boot js
+----------------
+  <script>
+        let data = fetch('http://localhost:8080/empapp/employee')
+        data.then((item) => {
+            return item.json();
+        }).then((result) => {
+            console.log(result);
+        })
+
+    </script>
