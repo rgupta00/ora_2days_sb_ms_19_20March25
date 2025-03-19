@@ -1,9 +1,44 @@
 Spring boot Microservice Training:
 ------------------------------------
+
+Introduction to the trainer:
+https://www.linkedin.com/in/rajeevguptajavatrainer/
+
+Introduction to the trainee:
+done
+
+
+SW setup
+----------
+Jdk 17
+https://www.oracle.com/java/technologies/javase/jdk17-archive-downloads.html
+
+Maven
+https://dlcdn.apache.org/maven/maven-3/3.9.9/binaries/apache-maven-3.9.9-bin.zip
+
+
+STS
+https://cdn.spring.io/spring-tools/release/STS4/4.29.0.RELEASE/dist/e4.35/spring-tool-suite-4-4.29.0.RELEASE-e4.35.0-win32.win32.x86_64.zip
+
+
+Postman 
+https://www.postman.com/downloads/
+
+
+How to set env varaible correctly
+------------------------------------
+https://www.youtube.com/watch?v=QH18cZwDOyU&list=PLv2-IhRmhbyQpigiJ-cO1rz8Plp0tzSmY&ab_channel=BusyCoderAcademy
+
+docker/rancher
+------------
+?
+
+
+In case you want to downloads from google drive in one go:
+https://drive.google.com/file/d/1sev_EA0HUlRufRc9ziY0Hvzh5TIolwhQ/view?usp=sharing
+
+
 Duration 2 days:
-
-* SW installation
-
 * Key topics
 	Introduction to Microservices
 	Introduction to Spring Boot
@@ -17,25 +52,58 @@ Duration 2 days:
 	Microservices Development Lifecycle (Theory)
 	Securing Microservices using Spring Security
 
+Spring :
+--------
+	DI
+	AOP
+	Reduction of boilerplate code
+	https://www.youtube.com/playlist?list=PLv2-IhRmhbyT-N2b5ctc9wEBSOXyiejc6
+	
+	
+	
+Spring boot = spring - extra configuration
+			+ auto config of the bean
+			+ acutator (app monitoring)
+			+ embedded tomcat server
+			+ spring data ( u dont have to write dao layer)
+			+ jar packing which is easy while
+			
+			creating microservice project
+			
+			docker and k8s cloud 
+			
+			
+			sb --> ms ready ?
+			
+			
+			jar vs war ?
+			
+How to create basic rest application ? di ?
+--------------------------------------------
+
 
 Day 1: Spring Boot
 
 Key topics:
 ==================
 => Understand Depdendency Injection
-=> bean wiring :xml, annoation, java configuraton
+=> bean wiring :xml, annoation, java configuraton (refer YT)
 => REST basics
 => Spring boot REST application
-=> Spring data
 => ResponseEnitity
 => Exception handling
+
+
 => validation
-=> Spring boot profile
-=> best practices HATEOAS
+
+=> best practices HATEOAS (SKIP)
+
 =>Spring boot Monotring and Logging
 => spring boot profile
 => spring boot actuator
 => Spring boot Full stack application idea
+=> Spring data
+
 => Spring Boot microservice architecture
 => spring boot openfeign
 => Spring boot security
@@ -297,6 +365,34 @@ https://www.concretepage.com/spring-boot/spring-boot-commandlinerunner-and-appli
 	---------------------------
 	server.servlet.context-path=/productapp
 	server.port=8080
+
+
+
+
+http://localhost:8080/products
+
+http://localhost:8080/products/1
+
+http://localhost:8080/products/1
+
+http://localhost:8080/products/1/reviews/12
+
+
+
+http://localhost:8080/products
+
+
+http://localhost:8080/updateproduct
+http://localhost:8080/deleteProduct
+
+
+{
+	"errorMessage"":"product is not found",
+	"errorCode":404,
+	"toContact":"ravi@oracle.com",
+	"timeStamp":....................
+
+}
 
 
 
@@ -756,6 +852,9 @@ Supporting both xml and json:
 
 
 
+sw ci/cd 
+
+dev 			test 			qa 			pre-prod 		prod 
 
 
 spring boot reading property files:
@@ -794,7 +893,19 @@ public class InfoDto {
 }
 
 
+Spring boot logging customization
+Srping boot acutator
+Spring boot swagger
+Spring boot front end integration 
+adding new feature to the app : discount coupon
 
+tell you how to split this app into multiple application
+how to comm bw different services
+	RestTemplate
+	OpenFeign
+	
+	
+microservice design pattern
 
 
 
@@ -853,6 +964,45 @@ logging.file.name=/home/raj/Desktop/logs/server.log
  
 	     
 	     
+
+Spring boot Actuator:
+---------------------
+
+server.port=8080
+spring.devtools.restart.enabled=true
+#management.endpoints.web.exposure.exclude=*
+management.endpoints.web.exposure.include=health, custom-endpoint
+
+management.endpoint.health.show-details=always
+
+management.health.disk.enabled=true
+management.health.livenessstate.enabled=true
+management.health.readinessstate.enabled=true
+management.server.port=9090
+
+
+#/actuator/info endpoint will show the information given here, keys
+# that are started with info
+info.app.encoding=UTF-8
+info.app.java.source=11
+info.app.java.target=11
+info.app.name=spring booot actuator
+
+management.endpoint.info.enabled=true
+management.endpoint.health.enabled=true
+
+
+Custom end points
+
+@Configuration
+@Endpoint(id = "custom-endpoint")
+public class CustomEndpoints {
+    @ReadOperation
+    public String getCustomData(){
+        return "This is custom Data";
+    }
+}
+
 
    
 
