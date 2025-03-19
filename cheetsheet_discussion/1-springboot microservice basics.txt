@@ -475,6 +475,12 @@ UserInterface.PRODUCT_DELETE_SUCCESS=product added successfully
 Service.PRODUCT_NOT_EXISTS=Product not exist
 
 
+
+
+Hibernate / JPA => ORM frameworks
+
+JPA + H2 database
+
 in case of h2 database :
 ---------------------
 
@@ -495,6 +501,9 @@ logging.level.org.springframework.web: DEBUG
 logging.level.org.hibernate: ERROR
 
 spring.jpa.show-sql=true 
+
+
+
 
 
 
@@ -1267,4 +1276,15 @@ Spring boot js
             console.log(result);
         })
 
-    </script>
+ </script>
+
+
+
+
+
+servlet jsp
+
+spring , spring mvc
+
+spring boot
+MS
