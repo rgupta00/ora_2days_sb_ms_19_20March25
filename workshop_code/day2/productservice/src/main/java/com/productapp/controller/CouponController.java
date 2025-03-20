@@ -1,4 +1,4 @@
-package com.couponapp.controller;
+package com.productapp.controller;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.CrossOrigin;
@@ -8,9 +8,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.couponapp.entities.Coupon;
-import com.couponapp.service.CouponService;
-
+import com.productapp.entities.Coupon;
+import com.productapp.service.CouponService;
 
 @RestController
 @CrossOrigin("*")
@@ -22,7 +21,6 @@ public class CouponController {
 	public CouponController(CouponService couponService) {
 		this.couponService = couponService;
 	}
-
 
 	@PostMapping(path="coupons")
 	public Coupon addCoupon(@RequestBody Coupon coupon) {
@@ -36,4 +34,5 @@ public class CouponController {
 	public Coupon getCouponByCode(@PathVariable String couponCode) {
 		return couponService.findByDiscountCoupon(couponCode);
 	}
+
 }

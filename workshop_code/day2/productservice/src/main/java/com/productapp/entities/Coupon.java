@@ -1,4 +1,4 @@
-package com.couponapp.entities;
+package com.productapp.entities;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;

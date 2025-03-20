@@ -1,0 +1,1286 @@
+Microservice cheetsheet step by step:
+--------------------------------------
+Microservices Architecture?
+
+	=> Microservices architecture allows to avoid monolith application for 
+	large system. 
+
+	=> It provide loose coupling between collaborating processes which running
+	 independently in different environments with tight cohesion.
+
+Adv MS?	:)
+	=> Smaller code base is easy to maintain.
+	=> Easy to scale as individual component.
+	=> Technology diversity i.e. we can mix libraries, databases, frameworks etc.
+	=> Fault isolation i.e. a process failure should not bring whole system down.
+	=> Better support for smaller and parallel team.
+	=> Independent deployment
+	=> Deployment time reduce
+
+Microservices Challenges	:(
+
+	=> Difficult to achieve strong consistency across services
+	=> ACID transactions do not span multiple processes.
+	=> Distributed System so hard to debug and trace the issues
+	=> Greater need for end to end testing
+	=> Required cultural changes in across teams like Dev and Ops
+
+What is Spring Cloud?
+	=> building blocks for Cloud and Microservices
+	=> provides microservices infrastructure like provide use services
+		 such as Service Discovery, Configuration server and Monitoring.
+	=>  provides several other open source projects like Netflix OSS.
+	=>  provides PaaS like Cloud Foundry, AWS and Heroku.
+	=>  uses Spring Boot style starters
+
+
+
+Port Numbers for microservice:
+------------------------------
+coupons	:8083
+products	:8082
+Eureka server: 8070
+api gateway: 8072
+Zipkin: 9411
+
+spring boot microservice projectstep by step:
+-------------------------------------------
+web, actuator, lombok
+coupons	:8083
+products:8082
+
+Step 1: create coupons microservice
+------------------------------------
+
+coupons:
+--------
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public  class Coupon {
+	private String couponCode;
+	private int discountPercentage;
+	private LocalDateTime expiredOn;
+}
+
+public interface CouponService {
+    public Coupon getCouponByCode(String couponCode);
+}
+
+@Service
+public class CouponServiceImpl implements CouponService {
+    private static Map<String, Coupon> couponMap = new HashMap<>(); // TODO: <String, Coupon
+    static {
+        couponMap.put("SUP10", new Coupon("SUP10", 10, LocalDateTime.now()));
+        couponMap.put("SUP15", new Coupon("SUP15", 15, LocalDateTime.now()));
+        couponMap.put("SUP20", new Coupon("SUP20", 20, LocalDateTime.now()));
+    }
+    @Override
+    public Coupon getCouponByCode(String couponCode) {
+        return couponMap.get(couponCode);
+    }
+}
+
+application.yaml
+--------------
+server:
+  port: 8083
+spring:
+  profiles:
+    active:
+      - "default"
+  application:
+    name: coupons
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"
+  endpoint:
+    shutdown:
+      enabled: true
+  info:
+    env:
+      enabled: true
+
+
+
+
+Step 2: create products microservice
+------------------------------------
+
+products:
+----------
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class Product {
+    private int id;
+    private String name;
+    private String description;
+    private double price;
+    private String discountCoupon;
+    private double discountedPrice;
+}
+
+public class ProductNotFoundException extends RuntimeException{
+    public ProductNotFoundException(String message) {
+        super(message);
+    }
+}
+
+public interface ProductService {
+    public Product getById(int id, String couponCode);
+}
+
+@Service
+public class ProductServiceImpl implements ProductService{
+
+    @Override
+    public Product getById(int id, String couponCode) {
+        return new Product(id,"Laptop",
+                "Dell",100000.00,null,0.0);
+    }
+}
+
+
+
+
+application.yaml
+-------------------
+server:
+  port: 8082
+spring:
+  profiles:
+    active:
+      - "default"
+  application:
+    name: products
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"
+  endpoint:
+    shutdown:
+      enabled: true
+  info:
+    env:
+      enabled: true
+
+
+Step 3: Apply OpenFeign to products microservice to call coupons microservice:
+-------------------------------------------------------
+
+create CouponServiceProxy:
+----------------------------
+@FeignClient(name = "coupons", url = "http://localhost:8083")
+public interface CouponServiceProxy {
+    @GetMapping("coupon/{couponCode}")
+    public Coupon getCouponByCode(@PathVariable String couponCode);
+}
+
+Enable FeignClient: apply on top of bootstrap class
+---------------------------------------------
+@EnableFeignClients("com.productapp.proxyservice")
+
+
+change service layer:
+--------------------
+@Service
+public class ProductServiceImpl implements ProductService{
+
+    @Autowired
+    private CouponServiceProxy couponServiceProxy;
+
+    @Override
+    public Product getById(int id, String couponCode) {
+        Product productToReturn=new Product(id,"Laptop",
+                "Dell",100000.00,null,0.0);
+
+        Coupon coupon=couponServiceProxy.getCouponByCode(couponCode);
+
+        double discountedPrice=(100-coupon.getDiscountPercentage())* productToReturn.getPrice()/100;
+
+        return new Product(id,"Laptop",
+                "Dell",100000.00,couponCode,discountedPrice);
+    }
+}
+
+
+
+
+
+
+Step 4: Configure eureka server:
+-------------------------------
+create new project with: eureka server, actuator
+
+
+1. apply annotation on bootstrap class
+@EnableEurekaServer
+
+2. url pattern
+http://localhost:8070/
+
+check
+http://localhost:8070/eureka/app
+
+3. application.properties configuration for eureka server
+--------------------------
+spring.application.name=eureka
+server.port=8070
+eureka.instance.hostname=localhost
+eureka.client.fetch-registry=false
+eureka.client.register-with-eureka=false
+eureka.client.service-url.defaultZone=http://${eureka.instance.hostname}:${server.port}/eureka/
+management.endpoints.web.exposure.include=*
+management.health.readinessstate.enabled=true
+management.health.livenessstate.enabled=true
+management.endpoint.health.probes.enabled=true
+
+application.yaml
+----------------------
+spring:
+  application:
+    name: eureka
+server:
+  port: 8070
+eureka:
+  instance:
+    hostname: localhost
+  client:
+    fetch-registry: false
+    register-with-eureka: false
+    service-url:
+      defaultZone: http://${eureka.instance.hostname}:${server.port}/eureka/
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"
+  health:
+    readinessstate:
+      enabled: true
+    livenessstate:
+      enabled: true
+  endpoint:
+    health:
+      probes:
+        enabled: true
+		
+		
+
+
+
+configure eureka client in all  the projects accounts, cards and loans
+--------------------------------------------------------------------------
+ add eureka client dep to all projects
+ 
+eureka.instance.prefer-ip-address=true
+eureka.client.register-with-eureka=true
+eureka.client.fetch-registry=true
+eureka.client.service-url.defaultZone=http://localhost:8070/eureka/
+
+application.yaml
+----------------
+eureka:
+  instance:
+    prefer-ip-address: true
+  client:
+    register-with-eureka: true
+    fetch-registry: true
+    service-url:
+      defaultZone: http://localhost:8070/eureka/
+	  
+	
+
+5. now check all service must be registed with eureka server
+
+6. now replace hard coded url in Openfeign service to logical names and run the examples
+	give logical name of service 
+	
+//@FeignClient(name = "coupons", url = "http://localhost:8083")
+@FeignClient(name = "coupons")
+public interface CouponServiceProxy {
+    @GetMapping("coupon/{couponCode}")
+    public Coupon getCouponByCode(@PathVariable String couponCode);
+}
+
+
+
+
+
+
+
+step 5: config server 
+---------------------
+Create project for config server : config server, actuator, eureaka client
+
+Step 1: apply annotation to the bootstrap class
+----------------------------------------
+
+@EnableConfigServer
+
+step 2: configure config server
+--------------------------
+spring.application.name=configserver
+server.port=8888
+spring.cloud.config.server.git.uri=file:///C:/propfiles
+spring.cloud.config.server.git.clone-on-start=true
+spring.cloud.config.server.git.default-label=master
+
+application.yaml
+-------------
+spring:
+  cloud:
+    config:
+      server:
+        git:
+          uri: file:///C:/propfiles
+          clone-on-start: true
+          default-label: master
+
+  application:
+    name: configserver
+server:
+  port: 8888
+  
+  
+  
+step 3: create config client:
+----------------------------
+spring.config.import=optional:configserver:http://localhost:8888
+spring.profiles.active=dev
+
+application.yaml
+------------------
+spring:
+  config:
+    import: optional:configserver:http://localhost:8888
+
+
+
+
+step 6.gateway routing and cross cutting concern in 
+microservicve using "spring cloud gateway"
+-----------------------------------------------
+step 1:
+
+choose eureka client, actuator, api gateway
+
+<dependency>
+			<groupId>org.springframework.cloud</groupId>
+			<artifactId>spring-cloud-starter-gateway</artifactId>
+</dependency>
+
+
+
+property file configuration:
+--------------------------
+
+application.properties
+--------------------
+spring.application.name=gatewayserver
+server.port=8072
+eureka.instance.prefer-ip-address=true
+eureka.client.register-with-eureka=true
+eureka.client.fetch-registry=true
+eureka.client.service-url.defaultZone=http://localhost:8070/eureka/
+
+management.endpoints.jmx.exposure.include=*
+management.endpoint.health.probes.enabled=true
+management.health.readinessstate.enabled=true
+management.health.livenessstate.enabled=true
+
+
+application.yml
+--------------------
+server:
+  port: 8072
+spring:
+  application:
+    name: gateway
+
+eureka:
+  instance:
+    prefer-ip-address: true
+  client:
+    register-with-eureka: true
+    fetch-registry: true
+    service-url:
+      defaultZone: http://localhost:8070/eureka/
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"
+  health:
+    readinessstate:
+      enabled: true
+    livenessstate:
+      enabled: true
+  endpoint:
+    gateway:
+      enabled: true
+    health:
+      probes:
+        enabled: true
+Apply to get default gateway routing
+-------------------------------------
+
+
+		
+Java configuration give more flexiblity to define routes:
+---------------------------------------------------
+
+@Configuration
+public class RouteConfig {
+    @Bean
+    public RouteLocator busycoderRouteConfig(RouteLocatorBuilder routeLocatorBuilder) {
+        return routeLocatorBuilder.routes()
+                .route(p -> p
+                        .path("/productstore/productsms/**")
+                        .filters( f -> f.rewritePath("/productstore/productsms/(?<segment>.*)","/${segment}")
+                                .addResponseHeader("X-Response-Time", LocalDateTime.now().toString()))
+                        .uri("lb://PRODUCTS"))
+                .route(p -> p
+                        .path("/productstore/couponsms/**")
+                        .filters( f -> f.rewritePath("/productstore/couponsms/(?<segment>.*)","/${segment}")
+                                .addResponseHeader("X-Response-Time", LocalDateTime.now().toString()))
+                        .uri("lb://COUPONS"))
+               .build();
+    }
+}
+
+
+Configuring global filter:
+---------------------------
+
+@Component
+public class LoggingFilter implements GlobalFilter {
+	private Logger logger = LoggerFactory.getLogger(LoggingFilter.class);
+	@Override
+	public Mono<Void> filter(ServerWebExchange exchange, 
+			GatewayFilterChain chain) {
+		logger.info("Path of the request received -> {}", exchange.getRequest().getPath());
+		return chain.filter(exchange);
+	}
+}
+
+
+
+
+
+
+step 7.Configure resilence 4j to productstore application
+---------------------------------------------------------
+We can apply circuitbreaker pattern to api gateway
+and to indidual microservice
+
+
+
+
+Implementing circuitBreaker pattern in the product microservice:
+----------------------------------------------------------------
+Note: product microservice is calling coupon microservice
+
+integration circuitBreaker with feign client
+-----------------------------------------
+step 1: add dep to product ms
+
+<dependency>
+			<groupId>org.springframework.cloud</groupId>
+			<artifactId>spring-cloud-starter-circuitbreaker-resilience4j</artifactId>
+</dependency>
+		
+step 2:
+
+spring.cloud.openfeign.circuitbreaker.enabled=true
+resilience4j.circuitbreaker.configs.default.sliding-window-size=10
+resilience4j.circuitbreaker.configs.default.permitted-number-of-calls-in-half-open-state=2
+resilience4j.circuitbreaker.configs.default.automatic-transition-from-open-to-half-open-enabled=true
+resilience4j.circuitbreaker.configs.default.failure-rate-threshold=50
+resilience4j.circuitbreaker.configs.default.wait-duration-in-open-state=10s
+resilience4j.circuitbreaker.configs.default.max-wait-duration-in-half-open-state=5s
+
+
+using yaml:
+-----------
+spring:
+  cloud:
+    openfeign:
+      circuitbreaker:
+        enabled: true
+
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        sliding-window-size: 10
+        permitted-number-of-calls-in-half-open-state: 2
+        automatic-transition-from-open-to-half-open-enabled: true
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 10s
+        wait-duration-in-half-open-state: 5s 
+        #The wait-duration-in-open-state is the amount of time a circuit breaker remains open before switching to a half-open state
+		
+		
+		
+now we have to define fallback for feign client in product service
+-------------------------------------------------------------------
+
+@FeignClient(name = "coupons", fallback = CouponServiceFallBack.class)
+public interface CouponServiceProxy {
+	@PostMapping(path="coupons")
+	public Coupon addCoupon(@RequestBody Coupon coupon) ;
+	
+	@GetMapping(path="coupons/{couponCode}")
+	public Coupon getCouponByCode(@PathVariable String couponCode);
+}
+
+
+@Service
+public class CouponServiceFallBack implements CouponServiceProxy {
+
+	@Override
+	public Coupon addCoupon(Coupon coupon) {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	public Coupon getCouponByCode(String couponCode) {
+		return Coupon.builder().discountCoupon(couponCode).discount(0.05).expiration(LocalDateTime.now()).build();
+	}
+
+}
+
+
+
+Now observe the circuitBreaker urls
+
+http://localhost:8082/actuator
+http://localhost:8082/actuator/circuitbreakers
+
+
+
+
+Now stop loan ms and observe the behaviour of the application
+
+
+Applying circuitbreaker to api gateway 
+---------------------------------------
+
+step 1: add depdendency to the app
+		<dependency>
+			<groupId>org.springframework.cloud</groupId>
+			<artifactId>spring-cloud-starter-circuitbreaker-reactor-resilience4j</artifactId>
+		</dependency>
+		
+setp 2: config
+
+
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        sliding-window-size: 10
+        permitted-number-of-calls-in-half-open-state: 2
+        automatic-transition-from-open-to-half-open-enabled: true
+        failure-rate-threshold: 50 #percentage
+        wait-duration-in-open-state: 10s
+	
+	
+step 3: Configure circuit breaker for productsms and provide fallback:
+
+        return routeLocatorBuilder.routes()
+                .route(p -> p
+                        .path("/productstore/productsms/**")
+                        .filters( f -> f.rewritePath("/productstore/productsms/(?<segment>.*)","/${segment}")
+                                .addResponseHeader("X-Response-Time", LocalDateTime.now().toString())
+                                .circuitBreaker(config -> config.setName("mycircuitbreaker")
+                                        .setFallbackUri("forward:/contactSupport")))
+
+                        .uri("lb://PRODUCTS"))
+
+
+
+Step 4: creating fallback controller:
+
+@RestController
+public class FallbackController {
+    @RequestMapping("/contactSupport")
+    public Mono<String> contactSupport() {
+        return Mono.just("An error occurred. Please try after some time or contact support team!!!");
+    }
+}
+
+Observe circuitBreaker design pattern:
+						
+http://localhost:8072/actuator/circuitbreakers
+http://localhost:8072/actuator/circuitbreakerevents?name=mycircuitbreaker
+
+
+
+Http timeout configuration:
+------------------------------
+sometime service is very slow and we will not get immediate response
+
+it keep waiting for the response, a thread is block for the response
+
+how to overcome? we can define timeout configuration:
+
+if we try same with api gateway we get different response due to 
+
+ .circuitBreaker(config -> config.setName("mycircuitbreaker")
+                .setFallbackUri("forward:/contactSupport")))
+
+ with default timeout configuration of 1sec
+ 
+ how how to customized it? add configuration to the gateway service
+ 
+ spring:
+  cloud:
+    gateway:
+      discovery:
+        locator:
+          enabled: false
+          lower-case-service-id: true
+      httpclient:
+        connect-timeout: 1000
+        response-timeout: 2s
+	
+	
+retry pattern to the pattern to api gateway:
+----------------------------------------
+
+ .route(p -> p
+    .path("/productstore/productsms/**")
+        .filters( f -> f.rewritePath("/productstore/productsms/(?<segment>.*)","/${segment}")
+         .addResponseHeader("X-Response-Time", LocalDateTime.now().toString())
+          .retry(config -> config.setRetries(3)
+              .setMethods(HttpMethod.GET)
+               .setBackoff(Duration.ofMillis(100),Duration.ofMillis(1000),2,true))
+                 .circuitBreaker(config -> config.setName("mycircuitbreaker")
+                                        .setFallbackUri("forward:/contactSupport")))
+                    .uri("lb://PRODUCTS"))				
+
+
+
+Retry:Resilience4j Retry implementation in Spring Boot 
+------------------------------------------------------
+
+resilience4j.retry:
+  instances:
+    orderService:
+      maxRetryAttempts: 3
+      waitDuration: 11000
+	  
+	  
+ @GetMapping("/order")
+    @Retry(name = ORDERSERVICE,fallbackMethod = "fallback_retry")
+    public ResponseEntity<String> createOrder(){
+        logger.info("item service call attempted:::"+ attempts++);
+        String response = restTemplate.getForObject("http://localhost:8081/item", String.class);
+        logger.info("item service called");
+        return new ResponseEntity<String>(response, HttpStatus.OK);
+    }
+public ResponseEntity<String> fallback_retry(Exception e){
+        attempts=1;
+    return new ResponseEntity<String>("Item service is down", HttpStatus.INTERNAL_SERVER_ERROR);
+
+}
+
+
+Spring Boot with Resilience4j Bulkhead implementation  Bulkhead pattern 
+----------------------------------------------------------------------
+
+resilience4j.bulkhead:
+  instances:
+    orderService:
+      maxWaitDuration: 5000
+      maxConcurrentCalls: 5
+
+resilience4j.thread-pool-bulkhead:
+  instances:
+    orderService:
+      maxThreadPoolSize: 1
+      coreThreadPoolSize: 1
+      queueCapacity: 1
+	  
+Example:
+---------
+    @GetMapping("/order")
+    @Bulkhead(name=ORDER_SERVICE,fallbackMethod = "bulkHeadFallback")
+    public ResponseEntity<String> createOrder()
+    {
+        String response = restTemplate.getForObject("http://localhost:8081/item", String.class);
+        logger.info(LocalTime.now() + " Call processing finished = " + Thread.currentThread().getName());
+        return new ResponseEntity<String>(response, HttpStatus.OK);
+    }
+
+    public ResponseEntity<String> bulkHeadFallback(Exception t)
+    {
+        return new ResponseEntity<String>(" orderService is full and does not permit further calls", HttpStatus.TOO_MANY_REQUESTS);
+    }
+	
+	
+	
+
+
+
+
+Kafka integration
+=================
+ //send the message to the kafka topic once the order is placed
+ and notifications service recive the message and send a email to the customer
+ 
+ 
+Step 1: update docker compose file
+------------------------------------
+
+step 2: add dependency to the order application
+-----------------------------------
+       <dependency>
+            <groupId>org.springframework.kafka</groupId>
+            <artifactId>spring-kafka</artifactId>
+        </dependency>
+		
+	
+step 3: mentioned prop in application.properties file
+------------------------------------------------------	
+spring.kafka.bootstrap-servers=localhost:9092
+spring.kafka.template.default-topic=order-placed
+spring.kafka.producer.key-serializer=org.apache.kafka.common.serialization.StringSerializer
+spring.kafka.producer.value-serializer=org.springframework.kafka.support.serializer.JsonSerializer
+
+
+step 4: create POJO to hold the message
+--------------------------------------
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class OrderPlacedEvent {
+	private Product product;
+	private String email;
+	
+}
+
+step 4: send message 
+---------------------
+@RestController
+@CrossOrigin("*")
+public class ProductController {
+	
+	private final KafkaTemplate<String, OrderPlacedEvent> kafkaTemplate;
+	
+	//add new product
+	@PostMapping(path="products")
+	public ResponseEntity<Product> addProduct(  @RequestBody  @Valid Product product){
+		
+		//..............
+		OrderPlacedEvent orderPlacedEvent=new OrderPlacedEvent();
+		orderPlacedEvent.setEmail("raj@gmail.com");
+		orderPlacedEvent.setProduct(productToReturn);
+		
+		 kafkaTemplate.send("order-placed", orderPlacedEvent);
+		
+		//...........
+		
+	}
+	
+
+step 5: go to http://localhost:8086/ ie UI for apache kafka
+-------------------------------------------------------
+http://localhost:8086/
+
+Configure cluster:
+-----------------
+cluster name : localhost
+broker server: broker
+port : 29092
+
+Now validate and enter 
+go to dashboard and check Topics
+
+
+
+step 6: now we need to create consumer service
+ie notifications service (port 8085)
+----------------------------------------------
+ step 1: choose spring mvc , kafka dep, actuator, lombok
+ 
+ step 2: add Dto into same package "com.orders.event"
+ 
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class OrderPlacedEvent {
+	private Product product;
+	private String email;
+	
+}
+
+step 3: put kafka consumer properties in application.properties file
+
+# Kafka Consumer Properties
+spring.kafka.bootstrap-servers=localhost:9092
+spring.kafka.consumer.group-id=notification-service
+spring.kafka.consumer.key-deserializer=org.apache.kafka.common.serialization.StringDeserializer
+spring.kafka.consumer.value-deserializer=org.springframework.kafka.support.serializer.JsonDeserializer
+spring.kafka.consumer.properties.spring.json.trusted.packages=*
+
+step 4: Write consumer to consume message send by order asynchronously
+
+@Service
+@Slf4j
+public class NotificationService {
+
+    @KafkaListener(topics = "order-placed", groupId = "notification-service")
+    public void sendNotification(OrderPlacedEvent orderPlacedEvent) {
+    	System.out.println("------------------------------");
+        System.out.println(orderPlacedEvent);
+        log.info("Sending notification to customer {} for order {}",
+                orderPlacedEvent.getEmail());
+    }
+}
+		
+		
+		
+			
+Step 6: Configure fake email server account at 
+https://mailtrap.io/ and send email to the customer
+		
+		
+		
+	
+	
+	
+	
+Observablility using graphan stack
+==================================
+
+What is Observability?
+---------------------------
+	Observability is the process of understanding the internal state of the application 
+	with the help of different indicators such as Logs, Metrics, and Tracing information.
+
+	Log matrix and traces
+	------------------
+	Log: application logs
+	
+	matrix: jvm statistics, thread count, Heap memory etc
+	
+	Traces: distributed tracking
+		help to traces application flow from A -> B
+		
+		
+	https://www.ibm.com/think/topics/observability
+
+
+
+Grafana Stack comprises about 3 softwares:
+----------------------------------------
+	Grafana: 
+		Tool that helps to monitor and visualize the metrics of our application.
+		
+		Users can visualize the metrics by building different dashboards and can use 
+		different kinds of charts to visualize the metrics. 
+		We can also configure alerts to be notified whenever a metric reaches a certain required threshold.
+
+	Prometheus:
+		Scraping matrix
+		
+		To collect metrics, we will be using Prometheus, 
+		a metrics aggregation tool.
+
+	Loki: 
+			is a Log Aggregation tool that receives the logs from our application
+			and indexes the logs to be visualized using Grafana.
+			
+			Loki: aggrigate logs of application for logging
+			
+			https://signoz.io/blog/loki-vs-elasticsearch/
+			https://opsverse.io/2024/07/26/grafana-loki-vs-elk-stack-for-logging-a-comprehensive-comparison/
+
+	Tempo: 
+			Tempo: simpilar to zipkin to distributed tracing
+			is used as a distributed tracing tool, which can track requests that span across different systems.
+			
+k
+	
+	
+	
+Step 1:Let's start with implementing logging in our application
+---------------------------------------------------
+
+Step 1.1: To send our application logs to Loki, we have to add the below 
+dependency to the pom.xml of both all applications.
+
+ <dependency>
+        <groupId>com.github.loki4j</groupId>
+        <artifactId>loki-logback-appender</artifactId>
+        <version>1.3.2</version>
+    </dependency>
+	
+Step 1.2: define a logback-spring.xml file inside the src/main/resources which contains
+ necessary information about how to structure our logs and where to send the logs 
+
+logback-spring.xml
+-----------------
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <include resource="org/springframework/boot/logging/logback/base.xml"/>
+    <springProperty scope="context" name="appName" source="spring.application.name"/>
+    <springProperty scope="context" name="lokiUrl" source="loki.url"/>
+
+    <appender name="LOKI" class="com.github.loki4j.logback.Loki4jAppender">
+        <http>
+            <url>${lokiUrl}</url>
+        </http>
+        <format>
+            <label>
+                <pattern>application=${appName},host=${HOSTNAME},level=%level</pattern>
+            </label>
+            <message>
+                <pattern>${FILE_LOG_PATTERN}</pattern>
+            </message>
+            <sortByTime>true</sortByTime>
+        </format>
+    </appender>
+
+    <root level="INFO">
+        <appender-ref ref="LOKI"/>
+    </root>
+</configuration>
+
+
+Note: dont forget to mentioned in the application.properties file of each projects
+-----------------------------------------------------------------------------------
+loki.url=http://localhost:3100/loki/api/v1/push
+
+
+
+
+
+
+Step 2: Metrics
+	Metrics can be any kind of measurable information about our application like JVM statistics,
+	 Thread Count, Heap Memory information, etc. To collect metrics of our application,
+	 we need to first enable Spring Boot Actuator in our project by adding the below dependency:
+	
+step 2.1:
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-actuator</artifactId>
+		</dependency>
+		
+step 2.2:
+	To expose the metrics of our application, Spring Boot uses Micrometer to collect metrics, 
+	and by adding the below dependency we can configure Micrometer to
+	expose an endpoint that can be scraped by Prometheus.
+
+		<dependency>
+			<groupId>io.micrometer</groupId>
+			<artifactId>micrometer-registry-prometheus</artifactId>
+			<scope>runtime</scope>
+		</dependency>
+		
+step 2.3:
+The next step is to add some properties to our application.yml file.
+
+management.endpoints.web.exposure.include=health, info, metrics, prometheus
+management.metrics.distribution.percentiles-histogram.http.server.requests=true
+management.observations.key-values.application=loan-service
+
+
+step 2.4: put prometheus config in docker compose file
+
+step 2.5: understand prometheus.yml file
+	Under the global field, we defined the scrape and evaluation interval as 2s.
+	In the scrape_configs section, we have many jobs, 
+	one for prometheus, 
+	and for each service. 
+	
+	Notice that to scrape the loan-service and fraud-detection services we defined the URL 
+	of both the services and the metrics path as - /actuator/prometheus
+	
+	
+	
+Distributed Tracing using Tempo
+---------------------------------
+	Now let implement Distributed Tracing using Tempo. 
+	
+	NOte : Prior to Spring Boot 3, we used to add the Spring Cloud Sleuth dependency
+	to add distributed tracing capabilities to our application, but from Spring Boot 3, 
+	Spring Cloud Sleuth is no longer needed and this is replaced by the Micrometer Tracing Project.
+	
+	
+Step 1.1: 
+	To add the support, add the below dependencies:
+	
+		<dependency>
+			<groupId>io.micrometer</groupId>
+			<artifactId>micrometer-tracing-bridge-brave</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>io.zipkin.reporter2</groupId>
+			<artifactId>zipkin-reporter-brave</artifactId>
+		</dependency>
+		
+	Note: 
+		micrometer-tracing-bridge-brave is the dependency that does all
+		the magic and adds distributed tracing for our application. 
+		
+		Whereas zipkin-reporter-brave will export the tracing information to Tempo.
+		
+		We can also use other tracing implementation like OpenTelemetry -
+		micrometer-tracing-bridge-otel dependency instead of 
+		Brave - micrometer-tracing-bridge-brave
+		
+		
+step 1.2: in order to trace the calls to the database
+		<dependency>
+			<groupId>net.ttddyy.observation</groupId>
+			<artifactId>datasource-micrometer-spring-boot</artifactId>
+			<version>1.0.1</version>
+		</dependency>
+		
+	 step 1.3: apply @Observed on the repo layer
+	 
+	 step 1.4: define bean
+	 
+@Configuration
+public class ObservationConfig {
+	@Bean
+	ObservedAspect observedAspect(ObservationRegistry registry) {
+				return new ObservedAspect(registry);
+			}
+}
+
+	step 1.5:it need 
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-aop</artifactId>
+		</dependency>
+		
+		
+	Micrometer Tracing will only send 10% of the traces it generates to Tempo, 
+	just to avoid overwhelming it with a lot of requests. 
+	We can set it to 100% by adding the below property to our application.yml file
+
+	step 1.6:
+		management.tracing.sampling.probability=1.0
+
+	step 1.7:
+		Configure Tempo using docker, by configure into  docker-compose.yml file
+		
+	step 1.8:
+		 configure a file called tempo.yml file to store the necessary settings to be used in Tempo.
+		 
+		 
+		 
+
+Running Grafana
+------------------------
+	let run Grafana using Docker. 
+	After all, this is what brings all the services like Tempo, Loki, and Prometheus together and
+	visualizes the information produced by our services.
+	
+	step 1.1: configure graphana in docker compose file
+	
+	step 1.2: define the data sources from which it needs to gather the information to visualize, 
+	for that let's create a file called datasources.yml
+	
+	
+	
+Now Explore and try to get desired output:
+-----------------------------------------
+http://localhost:3000
+
+	Toggle menu ---> 'Explore'
+		Under the dropdown select - 'Loki' and 
+		run the query with your desired parameters, 
+		e.g.: select the application label as - loan-service.
+
+	
+
+	
+
+
+
+
+
+
+
+
+
+step 10: Microservice security:
+---------------------------------
+spring sec:
+	basics auth
+	jwt auth
+
+OAuth2? is mainly used for delegated authorization?
+spring sec of ms
+
+OAuth2  ( jpa -> hibeante, eclipselink)
+------------------------------
+Protocol that allow a user to grant limited access to there
+resouces on one site to the another side
+without exposing there credential
+
+Open ID connect
+----------------
+OAuth2 was designed for authorization
+Open ID connect is build on top of Oauth2
+
+Open ID connect: id token to the request
+OAuth2
+http
+
+what type of request flows is supported by Oauth2?
+--------------------------------------------
+1. Authroization code grant (front end + back end)
+2. client credential grant (backend application )
+		service -----------------service2
+		
+3. Resouce owner passaward grant type (back application)
+4. Implicit code grant (js application)
+
+
+
+OAuth keyclock integration:
+---------------------------
+
+step 2: register client application with keycloak server:
+---------------------------------------------------
+client -> create client -> openid connect
+
+provide:
+cc: client credential
+
+client id: busycoder-cc
+
+client name: busycoder-cc-app
+
+enable client authentication--->auth flow --> service accounts roles (other dont select)
+				two application try to communicate each other
+				
+copy client secret:
+
+client secret: m7HORkFYJxde3x0JB7e5qdKBBIoaw9Zq
+
+
+
+
+
+step 3: getting access token form auth server in client credential grant flow:
+------------------------------------------------------------------------------
+
+go to relem setting-->open endpoint section
+http://localhost:8181/realms/spring-ms-realm/.well-known/openid-configuration
+
+
+
+select and create new post request to following url to get token:
+
+http://localhost:8181/realms/master/protocol/openid-connect/token
+
+
+
+grant_type: client_credentials
+client_id: busycoder-cc
+client_secret: m7HORkFYJxde3x0JB7e5qdKBBIoaw9Zq
+scope: openid email profile
+
+understand token formate
+
+
+step 4: Securing gateway server as resource server:
+
+add following dependencies:
+
+<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-security</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.security</groupId>
+			<artifactId>spring-security-oauth2-resource-server</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.security</groupId>
+			<artifactId>spring-security-oauth2-jose</artifactId>
+		</dependency>
+
+
+
+step 5: add configuration to customized security
+
+@Configuration
+@EnableWebFluxSecurity
+public class SecurityConfig {
+    @Bean
+    public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity serverHttpSecurity) {
+        serverHttpSecurity.authorizeExchange(exchanges -> exchanges.pathMatchers(HttpMethod.GET).authenticated()
+                .pathMatchers("/busycoder/accounts/**").authenticated()
+                .pathMatchers("/busycoder/cards/**").authenticated()
+                .pathMatchers("/busycoder/loans/**").authenticated())
+                .oauth2ResourceServer(oAuth2ResourceServerSpec -> oAuth2ResourceServerSpec
+                        .jwt(Customizer.withDefaults()));
+        serverHttpSecurity.csrf(csrfSpec -> csrfSpec.disable());
+        return serverHttpSecurity.build();
+    }
+}
+
+
+
+step 6: resourceserver will fetch certificates from auth server
+		resourceserver will validate token using this certificates
+		
+spring:
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: "http://localhost:7080/realms/master/protocol/openid-connect/certs"
+		  
+
+step 7: now try calling api
+
+Select auth type: oauth2
+add authorization data to : request headers
+
+configure new token:
+token : clientcredentials _ccesstoken
+grant type: client credential
+Auth access url: http://localhost:8181/realms/spring-ms-realm/protocol/openid-connect/token
+client id: busycoder-cc
+Client Secret: m7HORkFYJxde3x0JB7e5qdKBBIoaw9Zq
+Scope: openid email profile
+Client Authentication: send client credential in body
+
+
+use token type: access token
+
+
+
+
+
+
+
+
+
+
+
+
+
+spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver
+spring.datasource.url=jdbc:mysql://localhost:3316/inventory_service?createDatabaseIfNotExist=true
+spring.datasource.username=root
+spring.datasource.password=mysql
+spring.jpa.hibernate.ddl-auto=none
+server.port=8082

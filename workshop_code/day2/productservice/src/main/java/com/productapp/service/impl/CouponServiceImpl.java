@@ -1,13 +1,13 @@
-package com.couponapp.service.impl;
+package com.productapp.service.impl;
 
 import java.time.LocalDateTime;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import com.couponapp.entities.Coupon;
-import com.couponapp.repo.CouponRepo;
-import com.couponapp.service.CouponService;
+import com.productapp.entities.Coupon;
+import com.productapp.repo.CouponRepo;
+import com.productapp.service.CouponService;
 @Service
 public class CouponServiceImpl implements CouponService{
 

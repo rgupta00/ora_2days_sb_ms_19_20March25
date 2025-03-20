@@ -1,6 +1,6 @@
-package com.couponapp.service;
+package com.productapp.service;
 
-import com.couponapp.entities.Coupon;
+import com.productapp.entities.Coupon;
 
 public interface CouponService {
 

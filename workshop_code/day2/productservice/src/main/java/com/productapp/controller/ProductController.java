@@ -4,7 +4,9 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.List;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -15,9 +17,9 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.productapp.dto.Coupon;
+import com.productapp.entities.Coupon;
 import com.productapp.entities.Product;
-import com.productapp.proxy.CouponServiceProxy;
+import com.productapp.service.CouponService;
 import com.productapp.service.ProductService;
 //json parser: java <---> json
 
@@ -32,9 +34,16 @@ import lombok.AllArgsConstructor;
 public class ProductController {
 	
 	private final ProductService productService;
-	private final CouponServiceProxy couponServiceProxy;
+
+	private final CouponService couponService;
 	
-	@GetMapping(path="products")
+	
+
+	//data + correct httpstatus code
+	//ResponseEntity<T> =container =data + status code
+	
+	//get all products
+	@GetMapping(path="products", produces =  {MediaType.APPLICATION_JSON_VALUE, MediaType.APPLICATION_XML_VALUE})
 	public ResponseEntity<List<Product>> getAll(){
 		return ResponseEntity.ok(productService.getAll());
 	}
@@ -51,8 +60,7 @@ public class ProductController {
 	@PostMapping(path="products")
 	public ResponseEntity<Product> addProduct(  @RequestBody  @Valid Product product){
 		//100 10
-		Coupon coupon=couponServiceProxy.getCouponByCode(product.getDiscountCoupon());
-		
+		Coupon coupon=couponService.findByDiscountCoupon(product.getDiscountCoupon());
 		BigDecimal originalPrice = product.getPrice(); // Example price
         BigDecimal discountRate = new BigDecimal(coupon.getDiscount()); // 10% discount
 
