@@ -49,7 +49,7 @@ public class ProductControllerAdvice {
 		return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorInfo);
 	}
 	
-	@ExceptionHandler(Exception.class)
+	//@ExceptionHandler(Exception.class)
 	public ResponseEntity<ErrorInfo> handle500(Exception ex){
 		ErrorInfo errorInfo=ErrorInfo.builder()
 				.errorCode(500)

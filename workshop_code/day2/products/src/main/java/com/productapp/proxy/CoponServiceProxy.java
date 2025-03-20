@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import com.productapp.dto.Coupon;
 //? openfeign is going to impl this contract
 //@FeignClient(name="copons", url="http://localhost:8083")
-@FeignClient(name="COPONS")
+@FeignClient(name="COUPONS", fallback = CouponServiceFallBack.class)
 //COPONS
 public interface CoponServiceProxy {
 	@PostMapping(path="coupons")

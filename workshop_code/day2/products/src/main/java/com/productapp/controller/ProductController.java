@@ -10,6 +10,7 @@ import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -20,6 +21,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.productapp.dto.Coupon;
+import com.productapp.dto.OrderPlacedEvent;
 import com.productapp.entities.Product;
 import com.productapp.proxy.CoponServiceProxy;
 import com.productapp.service.ProductService;
@@ -39,10 +41,15 @@ public class ProductController {
 
 	private final CoponServiceProxy coponServiceProxy;
 	
+	private final KafkaTemplate<String, OrderPlacedEvent> kafkaTemplate;
+	
+
 	@Autowired
-	public ProductController(ProductService productService, CoponServiceProxy coponServiceProxy) {
+	public ProductController(ProductService productService, CoponServiceProxy coponServiceProxy,
+			KafkaTemplate<String, OrderPlacedEvent> kafkaTemplate) {
 		this.productService = productService;
 		this.coponServiceProxy = coponServiceProxy;
+		this.kafkaTemplate = kafkaTemplate;
 	}
 
 
@@ -88,7 +95,13 @@ public class ProductController {
         finalPrice = finalPrice.setScale(2, RoundingMode.HALF_UP);
 
         product.setDiscountedPrice(finalPrice);
+        
+        OrderPlacedEvent event=new OrderPlacedEvent();
+        event.setProduct(product);
+        event.setEmail(product.getEmail());
 		
+        kafkaTemplate.send("order-placed", event);
+        
 		Product productToReturn= productService.addProduct(product);
 		
 		return ResponseEntity.status(HttpStatus.CREATED).body(productToReturn);
